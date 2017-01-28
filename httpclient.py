@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-# Copyright 2016 Abram Hindle, https://github.com/tywtyw2002, and https://github.com/treedust
+# Copyright 2016 Abram Hindle, https://github.com/tywtyw2002, and https://github.com/treedust, Kyle Carlstrom
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,30 +23,41 @@ import socket
 import re
 # you may use urllib to encode data appropriately
 import urllib
+import urlparse
 
 def help():
     print "httpclient.py [GET/POST] [URL]\n"
 
 class HTTPResponse(object):
     def __init__(self, code=200, body=""):
-        self.code = code
+        self.code = int(code)
         self.body = body
 
 class HTTPClient(object):
-    #def get_host_port(self,url):
-
+    # Connect code based on lab tutorial by Joshua Campbell
     def connect(self, host, port):
-        # use sockets!
-        return None
+        port = int(port or 80)
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        return client_socket
 
     def get_code(self, data):
         return None
 
-    def get_headers(self,data):
-        return None
+    def get_headers(self, host, body_size, port=None):
+        port = port or 80
+        headers = ["Host: {}:{}\r\n".format(host, str(port))]
+        headers.append("Content-Length: {}\r\n".format(str(body_size)))
+        if body_size:
+            headers.append("Content-Type: application/x-www-form-urlencoded\r\n")
+        headers.append("\r\n")
+        return "".join(headers)
 
     def get_body(self, data):
-        return None
+        if data:
+            print("ENCODING: " + urllib.urlencode(data))
+            return urllib.urlencode(data)
+        return ""
 
     # read everything from the socket
     def recvall(self, sock):
@@ -60,15 +71,35 @@ class HTTPClient(object):
                 done = not part
         return str(buffer)
 
+    def parse_response(self, response):
+        status_code = response.split("\r\n")[0].split(" ")[1]
+        body = "" if len(response.split("\r\n\r\n", 1)) == 1 else response.split("\r\n\r\n", 1)[-1]
+        return HTTPResponse(status_code, body)
+
     def GET(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        parsed_url = urlparse.urlparse(url)
+        body = self.get_body(args)
+        headers = self.get_headers(parsed_url.hostname, len(body))
+        action = "GET {} HTTP/1.1\r\n".format(parsed_url.path)
+
+        client_socket = self.connect(parsed_url.hostname, parsed_url.port)
+        client_socket.sendall(action + headers + body)
+        message = self.recvall(client_socket)
+
+        return self.parse_response(message)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        parsed_url = urlparse.urlparse(url)
+        body = self.get_body(args)
+        headers = self.get_headers(parsed_url.hostname, len(body), parsed_url.port)
+        action = "POST {} HTTP/1.1\r\n".format(parsed_url.path)
+
+        client_socket = self.connect(parsed_url.hostname, parsed_url.port)
+        print(action + headers + body)
+        client_socket.sendall(action + headers + body)
+
+        message = self.recvall(client_socket)
+        return self.parse_response(message)
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
