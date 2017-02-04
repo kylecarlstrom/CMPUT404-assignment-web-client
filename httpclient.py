@@ -30,7 +30,7 @@ def help():
 
 class HTTPResponse(object):
     def __init__(self, code=200, body=""):
-        self.code = int(code)
+        self.code = code
         self.body = body
 
 class HTTPRequest(object):
@@ -79,7 +79,7 @@ class HTTPClient(object):
         return str(buffer)
 
     def parse_response(self, response):
-        status_code = response.split("\r\n")[0].split(" ")[1]
+        status_code = int(response.split("\r\n")[0].split(" ")[1])
         # Check if there is a body in the response and if so set it
         body = "" if len(response.split("\r\n\r\n", 1)) == 1 else response.split("\r\n\r\n", 1)[-1]
         return HTTPResponse(status_code, body)
